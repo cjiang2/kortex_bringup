@@ -10,9 +10,9 @@ import rospkg
 # Root directory of the project
 rospack = rospkg.RosPack()
 ROOT_DIR = rospack.get_path('kortex_bringup')
-sys.path.append(os.path.join(ROOT_DIR, "src"))
+sys.path.append(os.path.join(ROOT_DIR))
 
-from kinova_gen3 import KinovaGen3
+from kortex_bringup.kinova_gen3 import KinovaGen3
 
 if __name__ == "__main__":
     # Init ros node
