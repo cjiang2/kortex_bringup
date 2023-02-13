@@ -16,13 +16,13 @@ from kortex_driver.msg import *
 # In degree
 
 JOINT_LIMIT = {
-    0: [-180.0, 180.0],
-    1: [-128.9, 128.9],
-    2: [-180.0, 180.0],
-    3: [-147.8, 147.8],
-    4: [-180.0, 180.0],
-    5: [-120.3, 120.3],
-    6: [-180.0, 180.0],
+    0: [radians(-180.0), radians(180.0)],
+    1: [radians(-128.9), radians(128.9)],
+    2: [radians(-180.0), radians(180.0)],
+    3: [radians(-147.8), radians(147.8)],
+    4: [radians(-180.0), radians(180.0)],
+    5: [radians(-120.3), radians(120.3)],
+    6: [radians(-180.0), radians(180.0)],
 }
 
 JOINT_NAME_TO_ID = {
@@ -160,10 +160,10 @@ class KinovaGen3(object):
     def _joint_state_cb(self, msg):
         """Store joint angles inside the class instance.
         """
-        self.position = np.rad2deg(msg.position[:len(self.joint_names)]).astype(np.float64)
+        self.position = msg.position[:len(self.joint_names)].astype(np.float32)
         for i in range(len(self.position)):
             self.position[i] = np.clip(self.position[i], JOINT_LIMIT[i][0], JOINT_LIMIT[i][1])
-        self.vel = np.array(msg.velocity[:len(self.joint_names)]).astype(np.float64)
+        self.vel = np.array(msg.velocity[:len(self.joint_names)]).astype(np.float32)
         #print(self.position)
 
     def _call_subscribe_to_a_robot_notification(self):
@@ -211,9 +211,9 @@ class KinovaGen3(object):
         """Send Gen3 to default home position.
         """
         # The Home Action is used to home the robot. It cannot be deleted and is always ID #2:
+        self.last_action_notif_type = None
         req = ReadActionRequest()
         req.input.identifier = self.HOME_ACTION_IDENTIFIER
-        self.last_action_notif_type = None
         try:
             res = self.read_action(req)
         except rospy.ServiceException:
@@ -259,6 +259,7 @@ class KinovaGen3(object):
         # Clip the degrees by joint_limit
         for i in range(len(angles)):
             angles[i] = np.clip(angles[i], a_min=JOINT_LIMIT[i][0], a_max=JOINT_LIMIT[i][1])
+            angles[i] = degrees(angles[i])
 
         # Initialization
         self.last_action_notif_type = None
