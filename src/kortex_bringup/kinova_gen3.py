@@ -160,7 +160,7 @@ class KinovaGen3(object):
     def _joint_state_cb(self, msg):
         """Store joint angles inside the class instance.
         """
-        self.position = msg.position[:len(self.joint_names)].astype(np.float32)
+        self.position = np.array(msg.position[:len(self.joint_names)]).astype(np.float32)
         for i in range(len(self.position)):
             self.position[i] = np.clip(self.position[i], JOINT_LIMIT[i][0], JOINT_LIMIT[i][1])
         self.vel = np.array(msg.velocity[:len(self.joint_names)]).astype(np.float32)
@@ -237,11 +237,11 @@ class KinovaGen3(object):
         self,
         angles: list,
         angular_duration: float = 0.0,
-        MAX_ANGULAR_DURATION: float = 30.0,
+        MAX_ANGULAR_DURATION: float = radians(30.0),
         ):
         """Move Gen3 to specified joint angles.
         Args:
-            angles: list, 7 DOF, in degrees.
+            angles: list, 7 DOF, in radians.
             angular_duration: float. Control duration between AngularWaypoint 
                 in a trajectory. 0 by default.
             MAX_ANGULAR_DURATION: float. To validate if angles are safe.
