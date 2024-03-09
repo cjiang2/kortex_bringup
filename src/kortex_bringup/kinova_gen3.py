@@ -47,6 +47,7 @@ class KinovaGen3(object):
     def __init__(
         self,
         robot_name: str = "my_gen3",
+        read_joint_state: bool = False,
         ):
         # ####################
         # Connect to Gen3 and setup publishers and subscribers
@@ -77,9 +78,10 @@ class KinovaGen3(object):
             # -----
             # Store robot pose into python
             self.position = None
-            self.vel = None
-            self.joint_state_sub = rospy.Subscriber("/{}/joint_states".format(self.robot_name), 
-                                            JointState, self._joint_state_cb)
+            if read_joint_state:
+                self.position = None
+                self.joint_state_sub = rospy.Subscriber("/{}/joint_states".format(self.robot_name), 
+                                                JointState, self._joint_state_cb)
 
 
             # Gen3 publishers
