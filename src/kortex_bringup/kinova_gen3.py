@@ -237,7 +237,7 @@ class KinovaGen3(object):
 
     def send_joint_angles(
         self,
-        angles: list,
+        radians_: list,
         angular_duration: float = 0.0,
         MAX_ANGULAR_DURATION: float = radians(30.0),
         ):
@@ -254,14 +254,13 @@ class KinovaGen3(object):
         # [ERROR] [1650665544.432314487]: Attempt to get goal status on an uninitialized ServerGoalHandle or one that has no ActionServer associated with it.
         #self.send_joint_velocities([0, 0, 0, 0, 0, 0, 0])
 
-        # Make sure angles is a numpy array
-        if isinstance(angles, list):
-            angles = np.array(angles)
+        radians = radians_.copy()   # Memory Bugfix: Copy the value so that it does not impact elsewhere
 
-        # Clip the degrees by joint_limit
-        for i in range(len(angles)):
-            angles[i] = np.clip(angles[i], a_min=JOINT_LIMIT[i][0], a_max=JOINT_LIMIT[i][1])
-            angles[i] = degrees(angles[i])
+        # Make sure angles is a numpy array
+        if isinstance(radians, np.ndarray):
+            radians = radians.tolist()
+            
+        angles = [degrees(rad) for rad in radians]
 
         # Initialization
         self.last_action_notif_type = None
