@@ -162,11 +162,16 @@ class KinovaGen3(object):
     def _joint_state_cb(self, msg):
         """Store joint angles inside the class instance.
         """
-        self.position = np.array(msg.position[:len(self.joint_names)]).astype(np.float32)
-        for i in range(len(self.position)):
-            self.position[i] = np.clip(self.position[i], JOINT_LIMIT[i][0], JOINT_LIMIT[i][1])
-        self.vel = np.array(msg.velocity[:len(self.joint_names)]).astype(np.float32)
-        #print(self.position)
+        # self.position = np.array(msg.position[:len(self.joint_names)]).astype(np.float32)
+        # print(msg.position, msg.name)
+        position = []
+        for i in range(1, 8):
+            joint_name = f"joint_{i}"
+            idx = msg.name.index(joint_name)
+            position.append(msg.position[idx])
+        self.position = np.array(position)
+        # self.vel = np.array(msg.velocity[:len(self.joint_names)]).astype(np.float32)
+        # print(self.position)
 
     def _call_subscribe_to_a_robot_notification(self):
         # Activate the publishing of the ActionNotification
@@ -237,7 +242,7 @@ class KinovaGen3(object):
 
     def send_joint_angles(
         self,
-        radians_: list,
+        pos_: list,     # in radians
         angular_duration: float = 0.0,
         MAX_ANGULAR_DURATION: float = radians(30.0),
         ):
@@ -253,14 +258,14 @@ class KinovaGen3(object):
         # TODO: THIS IS CAUSING SOME WEIRD BUGS
         # [ERROR] [1650665544.432314487]: Attempt to get goal status on an uninitialized ServerGoalHandle or one that has no ActionServer associated with it.
         #self.send_joint_velocities([0, 0, 0, 0, 0, 0, 0])
-
-        radians = radians_.copy()   # Memory Bugfix: Copy the value so that it does not impact elsewhere
-
-        # Make sure angles is a numpy array
-        if isinstance(radians, np.ndarray):
-            radians = radians.tolist()
+        # Memory Bugfix: Copy the value so that it does not impact elsewhere
+        if isinstance(pos_, np.ndarray):
+            pos = pos_.copy()
+            pos = pos.tolist()
+        else:
+            pos = pos_[:]
             
-        angles = [degrees(rad) for rad in radians]
+        angles = [degrees(rad) for rad in pos]
 
         # Initialization
         self.last_action_notif_type = None
@@ -340,22 +345,25 @@ class KinovaGen3(object):
 
     def send_joint_velocities(
         self, 
-        vels: list,
+        vels_: list,
         ):
         """Set velocity for each individual joint.
         Use rad/s as inputs, then convert to deg/s to Kinova's likings.
         TODO: Might need to change max_rate to suit control frequency.
         """
         # Make sure angles is a numpy array
-        if isinstance(vels, list):
-            vels = np.array(vels)
+        if isinstance(vels_, np.ndarray):
+            vels = vels_.copy()
+            vels = vels.tolist()
+        else:
+            vels = vels_[:]
 
         # Initialization
         req = SendJointSpeedsCommandRequest()
 
         # Joint Speed to send to the robot
         for i in range(len(vels)):
-            vel = vels[i]
+            vel = degrees(vels[i])
             joint_speed = JointSpeed()
             joint_speed.joint_identifier = i
             joint_speed.value = vel
