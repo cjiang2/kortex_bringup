@@ -48,6 +48,7 @@ class KinovaGen3(object):
         self,
         robot_name: str = "my_gen3",
         read_joint_state: bool = False,
+        read_cartesian_pose: bool = False,
         ):
         # ####################
         # Connect to Gen3 and setup publishers and subscribers
@@ -83,11 +84,15 @@ class KinovaGen3(object):
                 self.joint_state_sub = rospy.Subscriber("/{}/joint_states".format(self.robot_name), 
                                                 JointState, self._joint_state_cb)
 
+            self.pose = None
+            if read_cartesian_pose:
+                self.cartesian_pose_sub = rospy.Subscriber("/{}/base_feedback".format(self.robot_name), 
+                                                BaseCyclic_Feedback, self._cartesian_pose_cb)
 
             # Gen3 publishers
             # -----
-            #self.cartesian_vel_pub = rospy.Publisher("/{}/in/cartesian_velocity".format(self.robot_name), 
-            #                            TwistCommand, queue_size=10)
+            self.cartesian_vel_pub = rospy.Publisher("/{}/in/cartesian_velocity".format(self.robot_name), 
+                                       TwistCommand, queue_size=10)
             
             #self.joint_vel_pub = rospy.Publisher("/{}/in/joint_velocity".format(self.robot_name), 
             #                            Base_JointSpeeds, queue_size=10)
@@ -413,6 +418,115 @@ class KinovaGen3(object):
         else:
             time.sleep(0.5)
             return True
+        
+    # #####
+    # Cartesian Control
+    # #####
+    def set_cartesian_reference_frame(self):
+        self.last_action_notif_type = None
+        # Prepare the request with the frame we want to set
+        req = SetCartesianReferenceFrameRequest()
+        req.input.reference_frame = CartesianReferenceFrame.CARTESIAN_REFERENCE_FRAME_MIXED
+
+        # Call the service
+        try:
+            self.set_cartesian_reference_frame(req)
+        except rospy.ServiceException:
+            rospy.logerr("Failed to call SetCartesianReferenceFrame")
+            return False
+        else:
+            rospy.loginfo("Set the cartesian reference frame successfully")
+
+        # Wait a bit
+        time.sleep(0.25)
+        return True
+
+    def _cartesian_pose_cb(self, msg):
+        """Store joint angles inside the class instance.
+        """
+        self.pose = [
+            msg.base.commanded_tool_pose_x,
+            msg.base.commanded_tool_pose_y,
+            msg.base.commanded_tool_pose_z,
+            radians(msg.base.commanded_tool_pose_theta_x),
+            radians(msg.base.commanded_tool_pose_theta_y),
+            radians(msg.base.commanded_tool_pose_theta_z),
+        ]
+
+
+    def send_cartesian_pose(
+        self,
+        pose_,
+        ):
+        self.last_action_notif_type = None
+
+        if isinstance(pose_, np.ndarray):
+            pose = pose_.copy()
+            pose = pose.tolist()
+        else:
+            pose = pose_[:]
+
+        # my_cartesian_speed = CartesianSpeed()
+        # my_cartesian_speed.translation = 0.1 # m/s
+        # my_cartesian_speed.orientation = 15  # deg/s
+
+        constrained_pose = ConstrainedPose()
+        # my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
+        constrained_pose.target_pose.x = pose[0]
+        constrained_pose.target_pose.y = pose[1]
+        constrained_pose.target_pose.z = pose[2]
+        constrained_pose.target_pose.theta_x = degrees(pose[3])
+        constrained_pose.target_pose.theta_y = degrees(pose[4])
+        constrained_pose.target_pose.theta_z = degrees(pose[5])
+
+        req = ExecuteActionRequest()
+        req.input.oneof_action_parameters.reach_pose.append(constrained_pose)
+        req.input.name = "pose1"
+        req.input.handle.action_type = ActionType.REACH_POSE
+        req.input.handle.identifier = 1001
+
+        try:
+            self.execute_action(req)
+        except rospy.ServiceException:
+            rospy.logerr("Failed to call send_cartesian_pose")
+            return False
+        else:
+            return self._wait_for_action_end_or_abort()
+
+        
+    def send_cartesian_velocity(
+        self,
+        vels_: list,
+        ):
+        # Make sure angles is a numpy array
+        if isinstance(vels_, np.ndarray):
+            vels = vels_.copy()
+            vels = vels.tolist()
+        else:
+            vels = vels_[:]
+        
+        twist_cmd = TwistCommand()
+        twist_cmd.reference_frame = 0
+        twist_cmd.twist.linear_x = vels[0]
+        twist_cmd.twist.linear_y = vels[1]
+        twist_cmd.twist.linear_z = vels[2]
+        twist_cmd.twist.angular_x = degrees(vels[3])
+        twist_cmd.twist.angular_y = degrees(vels[4])
+        twist_cmd.twist.angular_z = degrees(vels[5])
+
+        self.cartesian_vel_pub.publish(twist_cmd)
+        rospy.loginfo("Cartesian velocity: {}".format(vels))
+
+    def get_cartesian_pose(self):
+        msg = rospy.wait_for_message("/my_gen3/base_feedback", BaseCyclic_Feedback)
+        return [
+            msg.base.commanded_tool_pose_x,
+            msg.base.commanded_tool_pose_y,
+            msg.base.commanded_tool_pose_z,
+            radians(msg.base.commanded_tool_pose_theta_x),
+            radians(msg.base.commanded_tool_pose_theta_y),
+            radians(msg.base.commanded_tool_pose_theta_z),
+        ]
 
     def __str__(self):
         string = "Kinova Gen3\n"
